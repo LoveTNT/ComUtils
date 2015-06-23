@@ -1,0 +1,1145 @@
+
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".LoginActivity" >
+    <RelativeLayout
+        android:id="@+id/relativeLayout1"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentTop="true"
+        android:background="@drawable/s_search_bg" >
+        <TextView
+            android:id="@+id/title_tv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:text="注册"
+            android:textColor="@color/black_color"
+            android:textSize="20sp" />
+        <TextView
+            android:id="@+id/bt"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentLeft="true"
+            android:layout_centerVertical="true"
+            android:background="@null"
+            android:text="@string/find_password"
+            android:textColor="@drawable/text_blue"
+            android:textSize="@dimen/sixteen" />
+    </RelativeLayout>
+    <Button
+        android:id="@+id/send_message"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentRight="true"
+        android:layout_alignTop="@+id/phone_edit"
+        android:text="发送验证码" />
+    <EditText
+        android:id="@+id/phone_edit"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_below="@+id/relativeLayout1"
+        android:layout_marginTop="@dimen/tou_weight_height6"
+        android:layout_toLeftOf="@+id/send_message"
+        android:ems="10"
+        android:hint="请输入手机号" >
+    	<requestFocus />
+    </EditText>
+    <TextView
+        android:id="@+id/textView2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_below="@+id/phone_edit"
+        android:text="验证码:"
+        android:layout_marginTop="@dimen/tou_weight_height6"
+        android:textAppearance="?android:attr/textAppearanceLarge" />
+    <EditText
+        android:id="@+id/auth_code_edit"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@+id/textView2"
+        android:layout_alignBottom="@+id/textView2"
+        android:layout_alignParentRight="true"
+        android:layout_toRightOf="@+id/textView2"
+        android:ems="10"
+        android:hint="请输入验证码">
+    </EditText>
+    <Button
+        android:id="@+id/next_step_btn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentRight="true"
+        android:layout_below="@+id/auth_code_edit"
+        android:layout_marginTop="38dp"
+        android:text="@string/next_step" />
+</RelativeLayout>
+
+package com.smt.chashizaixian;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicNameValuePair;
+import org.json.JSONException;
+import org.json.JSONObject;
+import com.smt.config.Constants;
+import com.smt.config.URLInterface;
+import com.smt.pub.util.StringUtils;
+import com.smt.util.network.HttpUtils;
+import com.smt.util.network.NetTask;
+import com.smt.util.network.NetTask.INetComplete;
+import com.smt.util.t.ToastUtil;
+import android.os.Bundle;
+import android.app.Activity;
+import android.content.Intent;
+import android.util.Log;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.widget.Button;
+import android.widget.EditText;
+public class GetAuthCodeActivity extends Activity implements OnClickListener
+{
+    
+    private EditText phone_edit, auth_code_edit;
+    private Button send_message, next_step_btn;
+    private Boolean pressSend = false;
+    @Override
+    protected void onCreate(Bundle savedInstanceState)
+    {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_get_auth_code);
+        
+        phone_edit = (EditText) findViewById(R.id.phone_edit);
+        auth_code_edit = (EditText) findViewById(R.id.auth_code_edit);
+        send_message = (Button) findViewById(R.id.send_message);
+        next_step_btn = (Button) findViewById(R.id.next_step_btn);
+        
+        send_message.setOnClickListener(this);
+        next_step_btn.setOnClickListener(this);
+    }
+    @Override
+    public void onClick(View v)
+    {
+        final String phone = phone_edit.getText().toString() + "";
+        final String authCode = auth_code_edit.getText().toString() + "";
+        
+        switch (v.getId())
+        {
+        case R.id.send_message:
+            
+            if (StringUtils.isEmpty(phone) || !StringUtils.checkPhoneNum(phone))
+            {
+                ToastUtil.show(GetAuthCodeActivity.this, "请输入正确的11位手机号");
+                return;
+            }
+            
+            pressSend = true;
+            send_message.setEnabled(false);
+            send_message.postDelayed(new Runnable()
+            {
+                int mParseTime = Constants.SEND_MESSAGE_DELAY;
+                
+                @Override
+                public void run()
+                {
+                    if (mParseTime > 0 && pressSend)
+                    {
+                        mParseTime--;
+                        send_message.setText(mParseTime + "秒后发送");
+                    }
+                    else
+                    {
+                        mParseTime = Constants.SEND_MESSAGE_DELAY;
+                        send_message.setEnabled(true);
+                        send_message.setText("发送验证码");
+                        pressSend = false;
+                    }
+                    send_message.postDelayed(this, 1000);
+                }
+            }, 0);
+            
+            INetComplete callback = new INetComplete()
+            {
+                @Override
+                public void complete(String stringMsg)
+                {
+                    if (stringMsg == null)
+                    {
+                        return;
+                    }
+                    try
+                    {
+                        JSONObject jsonString = new JSONObject(stringMsg);
+                        int status = jsonString.getInt("status");
+                        if (1 == status)
+                        {
+                            ToastUtil.show(GetAuthCodeActivity.this, "验证码已发送，请查收");
+                        }      
+                        else
+                        {
+                            ToastUtil.show(GetAuthCodeActivity.this, "发送失败，请重试");
+                        }
+                    }
+                    catch (JSONException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            };
+            
+            final String urlSend = URLInterface.URL_SEND_MESSAGE;
+            final List<NameValuePair> paramsSend = new ArrayList<NameValuePair>();
+            paramsSend.add(new BasicNameValuePair("mobile", phone));
+            paramsSend.add(new BasicNameValuePair("type", "reg_captcha"));
+            new NetTask(GetAuthCodeActivity.this, paramsSend, callback, 
+                    HttpUtils.HTTP_GET).execute(urlSend);
+            
+            break;
+        case R.id.next_step_btn:
+            
+            if (StringUtils.isEmpty(phone) || !StringUtils.checkPhoneNum(phone))
+            {
+                ToastUtil.show(GetAuthCodeActivity.this, "请输入正确的11位手机号");
+                return;
+            }
+            if (authCode.length() < 1)
+            {
+                ToastUtil.show(GetAuthCodeActivity.this, "验证码不能为空");
+                return;
+            }
+            INetComplete callbackCheck = new INetComplete()
+            {
+                @Override
+                public void complete(String stringMsg)
+                {
+                    if (stringMsg == null)
+                    {
+                        return;
+                    }
+                    try
+                    {
+                        JSONObject jsonString = new JSONObject(stringMsg);
+                        int status = jsonString.getInt("status");
+                        if (1 == status)
+                        {
+                            Intent intent = new Intent(GetAuthCodeActivity.this, WriteRegistMsgActivity.class);
+                            intent.putExtra("captcha", authCode);
+                            intent.putExtra("mobile", phone);
+                            startActivity(intent);
+                        }      
+                        else
+                        {
+                            ToastUtil.show(GetAuthCodeActivity.this, jsonString.getString("info"));
+                        }
+                    }
+                    catch (JSONException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            };
+            
+            final String urlCheck = URLInterface.URL_CHECK_MESSAGE;
+            final List<NameValuePair> paramsCheck = new ArrayList<NameValuePair>();
+            paramsCheck.add(new BasicNameValuePair("mobile", phone));
+            paramsCheck.add(new BasicNameValuePair("captcha", authCode));
+            new NetTask(GetAuthCodeActivity.this, paramsCheck, callbackCheck, 
+                    HttpUtils.HTTP_GET).execute(urlCheck);
+            
+            break;
+        
+        default:
+            break;
+        }
+    }
+}
+package com.smt.chashizaixian;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicNameValuePair;
+import org.json.JSONException;
+import org.json.JSONObject;
+import com.smt.config.Constants;
+import com.smt.config.URLInterface;
+import com.smt.pub.util.StringUtils;
+import com.smt.util.network.HttpUtils;
+import com.smt.util.network.NetTask;
+import com.smt.util.network.NetTask.INetComplete;
+import com.smt.util.t.ToastUtil;
+import android.os.Bundle;
+import android.app.Activity;
+import android.content.Intent;
+import android.util.Log;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.widget.Button;
+import android.widget.EditText;
+public class GetPasswordActivity extends Activity implements OnClickListener
+{
+    
+    private EditText phone_edit, auth_code_edit;
+    private Button send_message, next_step_btn;
+    private Boolean pressSend = false;
+    @Override
+    protected void onCreate(Bundle savedInstanceState)
+    {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_get_password);
+        
+        phone_edit = (EditText) findViewById(R.id.phone_edit);
+        auth_code_edit = (EditText) findViewById(R.id.auth_code_edit);
+        send_message = (Button) findViewById(R.id.send_message);
+        next_step_btn = (Button) findViewById(R.id.next_step_btn);
+        
+        send_message.setOnClickListener(this);
+        next_step_btn.setOnClickListener(this);
+    }
+    @Override
+    public void onClick(View v)
+    {
+        final String phone = phone_edit.getText().toString() + "";
+        final String authCode = auth_code_edit.getText().toString() + "";
+        
+        switch (v.getId())
+        {
+        case R.id.send_message:
+            
+            if (StringUtils.isEmpty(phone) || !StringUtils.checkPhoneNum(phone))
+            {
+                ToastUtil.show(GetPasswordActivity.this, "请输入正确的11位手机号");
+                return;
+            }
+            
+            pressSend = true;
+            send_message.setEnabled(false);
+            send_message.postDelayed(new Runnable()
+            {
+                int mParseTime = Constants.SEND_MESSAGE_DELAY;
+                
+                @Override
+                public void run()
+                {
+                    if (mParseTime > 0 && pressSend)
+                    {
+                        mParseTime--;
+                        send_message.setText(mParseTime + "秒后发送");
+                    }
+                    else
+                    {
+                        mParseTime = Constants.SEND_MESSAGE_DELAY;
+                        send_message.setEnabled(true);
+                        send_message.setText("发送验证码");
+                        pressSend = false;
+                    }
+                    send_message.postDelayed(this, 1000);
+                }
+            }, 0);
+            
+            INetComplete callback = new INetComplete()
+            {
+                @Override
+                public void complete(String stringMsg)
+                {
+                    if (stringMsg == null)
+                    {
+                        return;
+                    }
+                    try
+                    {
+                        JSONObject jsonString = new JSONObject(stringMsg);
+                        int status = jsonString.getInt("status");
+                        if (1 == status)
+                        {
+                            ToastUtil.show(GetPasswordActivity.this, "验证码已发送，请查收");
+                        }      
+                        else
+                        {
+                            ToastUtil.show(GetPasswordActivity.this, "发送失败，请重试");
+                        }
+                    }
+                    catch (JSONException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            };
+            
+            final String urlSend = URLInterface.URL_SEND_MESSAGE;
+            final List<NameValuePair> paramsSend = new ArrayList<NameValuePair>();
+            paramsSend.add(new BasicNameValuePair("mobile", phone));
+            paramsSend.add(new BasicNameValuePair("type", "reg_captcha"));
+            new NetTask(GetPasswordActivity.this, paramsSend, callback, 
+                    HttpUtils.HTTP_GET).execute(urlSend);
+            
+            break;
+        case R.id.next_step_btn:
+            
+            if (StringUtils.isEmpty(phone) || !StringUtils.checkPhoneNum(phone))
+            {
+                ToastUtil.show(GetPasswordActivity.this, "请输入正确的11位手机号");
+                return;
+            }
+            if (authCode.length() < 1)
+            {
+                ToastUtil.show(GetPasswordActivity.this, "验证码不能为空");
+                return;
+            }
+            INetComplete callbackCheck = new INetComplete()
+            {
+                @Override
+                public void complete(String stringMsg)
+                {
+                    if (stringMsg == null)
+                    {
+                        return;
+                    }
+                    try
+                    {
+                        JSONObject jsonString = new JSONObject(stringMsg);
+                        int status = jsonString.getInt("status");
+                        if (1 == status)
+                        {
+                            Intent intent = new Intent(GetPasswordActivity.this, WriteRegistMsgActivity.class);
+                            intent.putExtra("captcha", authCode);
+                            intent.putExtra("mobile", phone);
+                            startActivity(intent);
+                        }      
+                        else
+                        {
+                            ToastUtil.show(GetPasswordActivity.this, jsonString.getString("info"));
+                        }
+                    }
+                    catch (JSONException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            };
+            
+            final String urlCheck = URLInterface.URL_CHECK_MESSAGE;
+            final List<NameValuePair> paramsCheck = new ArrayList<NameValuePair>();
+            paramsCheck.add(new BasicNameValuePair("mobile", phone));
+            paramsCheck.add(new BasicNameValuePair("captcha", authCode));
+            new NetTask(GetPasswordActivity.this, paramsCheck, callbackCheck, 
+                    HttpUtils.HTTP_GET).execute(urlCheck);
+            
+            break;
+        
+        default:
+            break;
+        }
+    }
+}
+package com.smt.pub.util;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.text.DecimalFormat;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
+/**
+ * 字符串工具类
+ * 
+ * @author Administrator
+ * 
+ */
+public class StringUtils {
+    /**
+     * 空字符串
+     */
+    public static final String STR_EMPTY = "";
+    /**
+     * 判断字符串是否为空
+     * 
+     * @param str
+     * @return
+     */
+    public static boolean isEmpty(String str) {
+        return str == null || "".equals(str.trim());
+    }
+    /**
+     * 字符串转stream
+     * 
+     * @param str
+     * @return
+     */
+    public static InputStream StringToInputStream(String str) {
+        if (StringUtils.isEmpty(str))
+            return null;
+        ByteArrayInputStream stream = new ByteArrayInputStream(str.getBytes());
+        return stream;
+    }
+    /**
+     * URL编码转换
+     * 
+     * @param src
+     * @return
+     */
+    public static String escape(String src) {
+        int i;
+        char j;
+        StringBuffer tmp = new StringBuffer();
+        tmp.ensureCapacity(src.length() * 6);
+        for (i = 0; i < src.length(); i++) {
+            j = src.charAt(i);
+            if (Character.isDigit(j) || Character.isLowerCase(j)
+                    || Character.isUpperCase(j))
+                tmp.append(j);
+            else if (j < 256) {
+                tmp.append("%");
+                if (j < 16)
+                    tmp.append("0");
+                tmp.append(Integer.toString(j, 16));
+            } else {
+                tmp.append("%u");
+                tmp.append(Integer.toString(j, 16));
+            }
+        }
+        return tmp.toString();
+    }
+    /**
+     * URL解码转换
+     * 
+     * @param src
+     * @return
+     */
+    public static String unescape(String src) {
+        StringBuffer tmp = new StringBuffer();
+        tmp.ensureCapacity(src.length());
+        int lastPos = 0, pos = 0;
+        char ch;
+        while (lastPos < src.length()) {
+            pos = src.indexOf("%", lastPos);
+            if (pos == lastPos) {
+                if (src.charAt(pos + 1) == 'u') {
+                    ch = (char) Integer.parseInt(
+                            src.substring(pos + 2, pos + 6), 16);
+                    tmp.append(ch);
+                    lastPos = pos + 6;
+                } else {
+                    ch = (char) Integer.parseInt(
+                            src.substring(pos + 1, pos + 3), 16);
+                    tmp.append(ch);
+                    lastPos = pos + 3;
+                }
+            } else {
+                if (pos == -1) {
+                    tmp.append(src.substring(lastPos));
+                    lastPos = src.length();
+                } else {
+                    tmp.append(src.substring(lastPos, pos));
+                    lastPos = pos;
+                }
+            }
+        }
+        return tmp.toString();
+    }
+    /**
+     * 字符串替换
+     * 
+     * @param line
+     * @param oldString
+     * @param newString
+     * @return
+     */
+    public static final String replace(String line, String oldString,
+            String newString) {
+        if (line == null) {
+            return null;
+        }
+        int i = 0;
+        if ((i = line.indexOf(oldString, i)) >= 0) {
+            char[] line2 = line.toCharArray();
+            char[] newString2 = newString.toCharArray();
+            int oLength = oldString.length();
+            StringBuffer buf = new StringBuffer(line2.length);
+            buf.append(line2, 0, i).append(newString2);
+            i += oLength;
+            int j = i;
+            while ((i = line.indexOf(oldString, i)) > 0) {
+                buf.append(line2, j, i - j).append(newString2);
+                i += oLength;
+                j = i;
+            }
+            buf.append(line2, j, line2.length - j);
+            return buf.toString();
+        }
+        return line;
+    }
+    /**
+     * 根据body内容生成完整的HTML内容
+     * 
+     * @param bodyContent
+     * @param encode
+     *            默认为utf-8
+     * @return
+     */
+    public static String genHtml(String bodyContent, String encode) {
+        if (encode == null || "".equals(encode.trim()))
+            encode = "utf-8";
+        StringBuffer sb = new StringBuffer();
+        sb.append("<html xmlns=http://www.w3.org/1999/xhtml>\n");
+        sb.append("<head>\n");
+        sb.append("<meta http-equiv='Content-Type' content='text/html; charset="
+                + encode + "' />\n");
+        sb.append("<title>查看消息</title>\n");
+        sb.append("</head>\n");
+        sb.append("\n");
+        sb.append("<body>\n");
+        sb.append(bodyContent);
+        sb.append("</body>");
+        sb.append("</html>");
+        return sb.toString();
+    }
+    public static String removeHtml(String htmlStr) {
+        String result = "";
+        boolean flag = true;
+        if (htmlStr == null || "".equals(htmlStr.trim())) {
+            return "";
+        }
+        htmlStr = htmlStr.replace("\"", ""); // 去掉引号
+        char[] a = htmlStr.toCharArray();
+        int length = a.length;
+        for (int i = 0; i < length; i++) {
+            if (a[i] == '<') {
+                flag = false;
+                continue;
+            }
+            if (a[i] == '>') {
+                flag = true;
+                continue;
+            }
+            if (flag == true) {
+                result += a[i];
+            }
+        }
+        return result.toString();
+    }
+    /************************************* Base64 编解码 *********************************************/
+    private static final char[] legalChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+            .toCharArray();
+    /** Base64 encode the given data */
+    public static String encode(byte[] data) {
+        int start = 0;
+        int len = data.length;
+        StringBuffer buf = new StringBuffer(data.length * 3 / 2);
+        int end = len - 3;
+        int i = start;
+        int n = 0;
+        while (i <= end) {
+            int d = ((((int) data[i]) & 0x0ff) << 16)
+                    | ((((int) data[i + 1]) & 0x0ff) << 8)
+                    | (((int) data[i + 2]) & 0x0ff);
+            buf.append(legalChars[(d >> 18) & 63]);
+            buf.append(legalChars[(d >> 12) & 63]);
+            buf.append(legalChars[(d >> 6) & 63]);
+            buf.append(legalChars[d & 63]);
+            i += 3;
+            if (n++ >= 14) {
+                n = 0;
+                buf.append(" ");
+            }
+        }
+        if (i == start + len - 2) {
+            int d = ((((int) data[i]) & 0x0ff) << 16)
+                    | ((((int) data[i + 1]) & 255) << 8);
+            buf.append(legalChars[(d >> 18) & 63]);
+            buf.append(legalChars[(d >> 12) & 63]);
+            buf.append(legalChars[(d >> 6) & 63]);
+            buf.append("=");
+        } else if (i == start + len - 1) {
+            int d = (((int) data[i]) & 0x0ff) << 16;
+            buf.append(legalChars[(d >> 18) & 63]);
+            buf.append(legalChars[(d >> 12) & 63]);
+            buf.append("==");
+        }
+        return buf.toString();
+    }
+    /**
+     * Decodes the given Base64 encoded String to a new byte array. The byte
+     * array holding the decoded data is returned.
+     */
+    public static byte[] decode(String s) {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        try {
+            decode(s, bos);
+        } catch (IOException e) {
+            throw new RuntimeException();
+        }
+        byte[] decodedBytes = bos.toByteArray();
+        try {
+            bos.close();
+            bos = null;
+        } catch (IOException ex) {
+            System.err.println("Error while decoding BASE64: " + ex.toString());
+        }
+        return decodedBytes;
+    }
+    private static void decode(String s, OutputStream os) throws IOException {
+        int i = 0;
+        int len = s.length();
+        while (true) {
+            while (i < len && s.charAt(i) <= ' ')
+                i++;
+            if (i == len)
+                break;
+            int tri = (decode(s.charAt(i)) << 18)
+                    + (decode(s.charAt(i + 1)) << 12)
+                    + (decode(s.charAt(i + 2)) << 6)
+                    + (decode(s.charAt(i + 3)));
+            os.write((tri >> 16) & 255);
+            if (s.charAt(i + 2) == '=')
+                break;
+            os.write((tri >> 8) & 255);
+            if (s.charAt(i + 3) == '=')
+                break;
+            os.write(tri & 255);
+            i += 4;
+        }
+    }
+    private static int decode(char c) {
+        if (c >= 'A' && c <= 'Z')
+            return ((int) c) - 65;
+        else if (c >= 'a' && c <= 'z')
+            return ((int) c) - 97 + 26;
+        else if (c >= '0' && c <= '9')
+            return ((int) c) - 48 + 26 + 26;
+        else
+            switch (c) {
+                case '+' :
+                    return 62;
+                case '/' :
+                    return 63;
+                case '=' :
+                    return 0;
+                default :
+                    throw new RuntimeException("unexpected code: " + c);
+            }
+    }
+    /************************************* 压缩、解压 ****************************************/
+    /**
+     * 压缩方法
+     * 
+     * @param str
+     * @return
+     */
+    public static byte[] compress(String str) {
+        if (str == null)
+            return null;
+        byte[] compressed;
+        ByteArrayOutputStream out = null;
+        ZipOutputStream zout = null;
+        try {
+            out = new ByteArrayOutputStream();
+            zout = new ZipOutputStream(out);
+            zout.putNextEntry(new ZipEntry("0"));
+            zout.write(str.getBytes());
+            zout.closeEntry();
+            compressed = out.toByteArray();
+        } catch (IOException e) {
+            compressed = null;
+        } finally {
+            if (zout != null) {
+                try {
+                    zout.close();
+                } catch (IOException e) {
+                }
+            }
+            if (out != null) {
+                try {
+                    out.close();
+                } catch (IOException e) {
+                }
+            }
+        }
+        return compressed;
+    }
+    /**
+     * 
+     * @param compressed
+     * @return
+     */
+    public static final String decompress(byte[] compressed) {
+        if (compressed == null)
+            return null;
+        ByteArrayOutputStream out = null;
+        ByteArrayInputStream in = null;
+        ZipInputStream zin = null;
+        String decompressed;
+        try {
+            out = new ByteArrayOutputStream();
+            in = new ByteArrayInputStream(compressed);
+            zin = new ZipInputStream(in);
+            byte[] buffer = new byte[1024];
+            int offset = -1;
+            while ((offset = zin.read(buffer)) != -1) {
+                out.write(buffer, 0, offset);
+            }
+            decompressed = out.toString();
+        } catch (IOException e) {
+            decompressed = null;
+        } finally {
+            if (zin != null) {
+                try {
+                    zin.close();
+                } catch (IOException e) {
+                }
+            }
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException e) {
+                }
+            }
+            if (out != null) {
+                try {
+                    out.close();
+                } catch (IOException e) {
+                }
+            }
+        }
+        return decompressed;
+    }
+    /**
+     * 检查是否符合手机号码格式
+     * 
+     * @param phoneNum
+     * @return
+     */
+    public static boolean checkPhoneNum(String phoneNum) {
+        final String regx = "^((13[0-9])|(15[^4,\\D])|(18[0-9]))\\d{8}$";
+        Pattern p = Pattern.compile(regx);
+        Matcher m = p.matcher(phoneNum);
+        return m.matches();
+    }
+    public static String format(double value,String chart){
+        DecimalFormat df = new DecimalFormat();
+        df.applyPattern(chart);       
+        return df.format(value);
+    }
+     public static String getVolume(String src){
+            if(!src.contains(".")){
+                return src;
+            }else{
+                String tmp = src.substring(src.indexOf(".")+1);
+                int i = Integer.parseInt(tmp);
+                System.out.println(i);
+                if(i==0){
+                    return src.substring(0,src.indexOf("."));
+                }else {
+                    return src;
+                }
+            }
+        }
+}
+
+package com.smt.util.network;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicNameValuePair;
+import android.annotation.SuppressLint;
+import android.content.Context;
+import android.os.Handler;
+import android.os.Message;
+import android.util.Log;
+import com.smt.config.Constants;
+import com.smt.util.t.NetWorkCheck;
+import com.smt.util.t.ToastUtil;
+public class NetTask
+{
+    private Class mClazz;
+    
+    private Type mType;
+    
+    private String mUrl;
+    
+    private int mMethod = 1; // 传输方式 0.get 1.post
+    
+    private List<NameValuePair> mParams;
+    
+    private INetComplete mNetComplete;
+    
+    private Context context;
+    
+    /**
+     * 
+     * @param params
+     * @param clazz
+     * @param iComplete
+     * @param method
+     */
+    public NetTask(Context context, List<NameValuePair> params, 
+            INetComplete iComplete, int method)
+    {
+        this(context, params, null, null, null, iComplete, method, false);
+    }
+    
+    private NetTask(Context context, List<NameValuePair> params,
+            Class<?> clazz, Type type, INetProgress iProgress,
+            INetComplete iComplete, int method, boolean isProgress)
+    {
+        this.context = context;
+        this.mParams = params;
+        this.mClazz = clazz;
+        this.mType = type;
+        this.mNetComplete = iComplete;
+        this.mMethod = method;
+    }
+    
+    @SuppressWarnings("unchecked")
+    protected String doInBackground(String... params)
+    {
+        if (mParams != null)
+        {
+            mUrl = revertUrl(params[0], mParams, mMethod);
+            mParams.add(new BasicNameValuePair("k", "opendoor"));
+        }
+        else
+        {
+            mParams = new ArrayList<NameValuePair>();
+            mParams.add(new BasicNameValuePair("k", "opendoor"));
+        }
+        
+        String jsonData = HttpUtils.getHttpEntity(mUrl, mParams, mMethod);
+        if (Constants.DEBUG && mParams != null)
+        {
+            System.out.println("params:" + Arrays.toString(mParams.toArray()));
+        }
+        if (Constants.DEBUG)
+        {
+            Log.e("get_from_Services", jsonData);
+        }
+        return jsonData;
+    }
+    
+    public void execute(final String url)
+    {
+        if (!NetWorkCheck.checkNetWork(context))
+        {
+            ToastUtil.show(context, "网络处于断开状态，请连接");
+            mNetComplete.complete(null);
+            return;
+        }
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                Object obj = doInBackground(url);
+                if (mNetComplete != null)
+                {
+                    Message msg = new Message();
+                    msg.obj = obj;
+                    handler.sendMessage(msg);
+                }
+            }
+        }).start();
+    }
+    
+    @SuppressLint("HandlerLeak")
+    Handler handler = new Handler()
+    {
+        
+        @Override
+        public void handleMessage(Message msg)
+        {
+            try
+            {
+                mNetComplete.complete((String) msg.obj);
+            }
+            catch (Exception e)
+            {
+                e.printStackTrace();
+            }
+            super.handleMessage(msg);
+        }
+    };
+    
+    /**
+     * 拼接get方式url参数
+     * 
+     * @param url
+     * @param params
+     * @param method
+     * @return
+     */
+    private String revertUrl(String url, List<NameValuePair> params, int method)
+    {
+        if ("".equals(url) || method != HttpUtils.HTTP_GET)
+        {
+            return url;
+        }
+        
+        StringBuilder sb = new StringBuilder(url);
+        
+        sb.append(url.contains("?") ? "&" : "?");
+        
+        boolean needRemove = false;
+        for (NameValuePair pair : params)
+        {
+            sb.append(pair.getName()).append("=").append(pair.getValue())
+                    .append("&");
+            needRemove = true;
+        }
+        
+        url = needRemove ? sb.substring(0, sb.length() - 1) : sb.toString();
+        return url;
+    }
+    
+    /*******************************************************************/
+    public interface INetProgress
+    {
+        public void progress();
+    }
+    
+    public interface INetComplete
+    {
+        public void complete(String stringMsg);
+    }
+    
+}
+package com.smt.config;
+import com.amap.api.maps.model.LatLng;
+import com.smt.imageload.util.ImageLoader;
+public class Constants {
+    /**
+     * 调试模式
+     */
+    public static final boolean DEBUG = true;
+    /**
+     * 茶市在线
+     */
+    public static final String USER_INFO = "userInfo";
+    /**
+     * ImageLoader对象
+     */
+    public static ImageLoader mImageLoader;
+    /**
+     * 定位当前位置返回request code值
+     */
+    public static final int LOCAL_REQUEST_CODE = 1;
+    /**
+     * 编辑修改返回request code值
+     */
+    public static final int EDIT_REQUEST_CODE = 2;
+    
+    /**
+     * 编辑返回页面“request code” key
+     */
+    public static final String RESULT_CODE = "resultcode";
+    /**
+     * 编辑返回页面标题 key
+     */
+    public static final String TITLE = "title";
+    /**
+     * 编辑返回页面编辑框默认显示 key
+     */
+    public static final String MIMECONTENT = "mimecontent";
+    /**
+     * 编辑返回页面编辑可输入文字数目 key
+     */
+    public static final String EDIT_COUNT_NUM = "edit_number";
+    /**
+     * 编辑返回页面返回文字 key
+     */
+    public static final String EDIT_RESULT = "edit_result";
+    /**
+     * 当前位置返回 key
+     */
+    public static final String LOCAL_RESULT = "local_result";
+    /**
+     * 清除当前位置返回 key
+     */
+    public static final String LOCAL_IF_CLEAR = "local_clear";
+    
+    public static final LatLng CHENGDU = new LatLng(30.679879, 104.064855);// 成都市经纬度
+    /**
+     * 新消息提醒方式
+     */
+    public static final String[] MESSAGE_REMIND = new String[] { "提醒 ", "智能 ", "屏蔽 "};
+    
+    /**
+     * http 请求成功返回status值
+     */
+    public static final int HTTP_RESPONSE_OK = 1;
+    /**
+     * http 请求成功失败status值
+     */
+    public static final int HTTP_RESPONSE_FAIL = 0;
+    
+    /**
+     * 连接超时时间 单位：ms
+     */
+    public static final int CONNECT_TIME_OUT = 25000;
+    
+    /**
+     * 读取超时时间 单位：ms
+     */
+    public static final int READ_TIME_OUT = 25000;
+    
+    /**
+     * 读取数据长度 单位：byte
+     */
+    public static final int READ_DATA_LENGTH = 1024;
+    /**
+     * 读取数据长度 单位：byte
+     */
+    public static final int SEND_MESSAGE_DELAY = 40;
+}
+
+package com.smt.config;
+public class URLInterface {
+    
+    
+    /**
+     * 接口请求服务器地址
+     */
+    public static final String REQUEST_HEAD = "http://192.168.1.228:8080/cha4online/";
+    /**
+     * 用户登录
+     */
+    public static final String URL_LOGIN = REQUEST_HEAD + "index.php?app=api&act=login";
+    /**
+     * 发送短信验证码接口
+     */
+    public static final String URL_SEND_MESSAGE = REQUEST_HEAD + "index.php?app=api&act=sendCaptcha";
+    /**
+     * 验证短信验证码接口
+     */
+    public static final String URL_CHECK_MESSAGE = REQUEST_HEAD + "index.php?app=api&act=checkCaptcha";
+    /**
+     * 用户注册
+     */
+    public static final String URL_REGIST = REQUEST_HEAD + "index.php?app=api&act=register";
+    /**
+     * 会员搜索接口
+     */
+    public static final String URL_USER_SEARCH = REQUEST_HEAD + "index.php?app=api&act=searchFriend";
+    /**
+     * 获取好友列表接口
+     */
+    public static final String URL_GET_CONTACTS = REQUEST_HEAD + "index.php?app=api&act=getAttentionList";
+    /**
+     * 添加好友列表接口
+     */
+    public static final String URL_ADD_FRIENDS = REQUEST_HEAD + "index.php?app=api&act=addAttention";
+    /**
+     * 删除好友列表接口
+     */
+    public static final String URL_DELETE_FRIENDS = REQUEST_HEAD + "index.php?app=api&act=cancelAttention";
+}
+
