@@ -1,0 +1,22 @@
+public class ExitorBack {
+
+	// 退出
+	public static void Exit(final Activity activity) {
+		
+		new AlertDialog.Builder(activity).setTitle("茶友帮提示").setMessage("确定退出？")
+				.setPositiveButton("确定", new OnClickListener() {
+
+					@Override
+					public void onClick(DialogInterface dialog, int which) {
+						activity.finish();
+						java.lang.System.exit(0);
+					}
+				}).setNegativeButton("取消", new OnClickListener() {
+
+					@Override
+					public void onClick(DialogInterface dialog, int which) {
+					}
+				}).show();
+	}
+
+}
